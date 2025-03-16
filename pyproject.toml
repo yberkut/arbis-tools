@@ -1,0 +1,14 @@
+[project]
+name = "arbis-tools"
+version = "0.1.0"
+description = "Arbis Tools — Modular Secure Toolkit for Arch-based Systems"
+authors = [
+    { name="Your Name", email="you@example.com" }
+]
+dependencies = [
+    "typer[all]",
+    "pyyaml"
+]
+
+[project.scripts]
+arbis-ksm = "ksm.cli:app"
