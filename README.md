@@ -9,6 +9,8 @@
 ## Install
 
 ```bash
+python3 -m venv at-venv
+source at-venv/bin/activate
 pip install .
 ```
 

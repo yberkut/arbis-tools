@@ -1,0 +1,37 @@
+usb:
+  device: "/dev/disk/by-id/usb-Kingston_DataTraveler_3.0_1C1B0D6C16C8E881996700D7-0:0"  # Замінити на реальний ID флешки
+  luks_name: "usb_crypt"
+  mount_point: "/mnt/usb"
+  keyfile: "main_keyfile"
+  header: "main_header.img"
+  keyfile_size: 4096
+
+# Майбутні розділи конфігу (для розширення пізніше):
+
+# ssd:
+#   device: "/dev/nvme0n1"
+#   luks_name: "ssd_crypt"
+#   luks_header: "/mnt/usb/main_header.img"
+#   luks_keyfile: "/mnt/usb/main_keyfile"
+#   vg_name: "vg0"
+#   efi_part: "1"
+#   boot_part: "2"
+#   luks_part: "3"
+#   lvs:
+#     - name: "root"
+#       size: "150G"
+#       fs: "ext4"
+#       mount_point: "/mnt"
+#     - name: "vms"
+#       size: "500G"
+#       fs: "ext4"
+#       mount_point: "/srv/vms"
+#     - name: "swap"
+#       size: "64G"
+#       fs: "swap"
+#     - name: "home"
+#       size: "180G"
+#       fs: "ext4"
+#       mount_point: "/mnt/home"
+
+# reserve_keyfile: "reserve_keyfile"
