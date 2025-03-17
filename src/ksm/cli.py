@@ -1,5 +1,5 @@
 import typer
-from ksm.usb import init_usb_store as init_usb_store_func
+from src.ksm.usb import init_usb_store as init_usb_store_func
 
 app = typer.Typer(help="Key and Secret Manager (KSM) for Arbis Tools")
 

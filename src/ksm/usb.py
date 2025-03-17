@@ -1,32 +1,9 @@
-from ksm.utils import read_config, run_cmd, ask_confirm, list_partitions, parse_size
+from src.core.utils import read_config, run_cmd, ask_confirm, list_partitions, parse_size, get_free_space, \
+    validate_partition_name
 import typer
 from pathlib import Path
 import subprocess
 import re
-
-
-def get_free_space(device: str):
-    result = subprocess.run(["sudo", "parted", device, "print", "free"], stdout=subprocess.PIPE, text=True)
-    output = result.stdout
-    free_spaces = []
-    for line in output.splitlines():
-        if "Free Space" in line:
-            parts = re.split(r'\s+', line.strip())
-            if len(parts) >= 2:
-                start, end = parts[0], parts[1]
-                free_spaces.append((start, end))
-    return free_spaces
-
-
-def validate_partition_name(partition: str, device: str, skip_validation: bool = False):
-    if skip_validation:
-        return
-    if not re.match(r'^sd[a-z][0-9]+$', partition):
-        typer.echo("❌ Invalid partition name format (example: sdb3)")
-        raise typer.Abort()
-    if not f"/dev/{partition}".startswith(device):
-        typer.echo(f"❌ Selected partition {partition} does not belong to device {device}")
-        raise typer.Abort()
 
 
 def init_usb_store(dry_run: bool = False):
@@ -85,28 +62,29 @@ def init_usb_store(dry_run: bool = False):
             raise typer.Abort()
 
         start_str, end_str = free_spaces[-1]
-        start_mb = parse_size(start_str)
-        end_mb = parse_size(end_str)
-        free_space_mb = end_mb - start_mb
+        start_kb = parse_size(start_str)
+        end_kb = parse_size(end_str)
+        free_space_kb = end_kb - start_kb
 
-        typer.echo(f"[INFO] Last free space: {start_mb} MiB - {end_mb} MiB (Total: {free_space_mb:.2f} MiB)")
+        typer.echo(f"[INFO] Last free space: {start_kb} kB - {end_kb} kB (Total: {free_space_kb:.2f} kB)")
 
         partition_size_str = input("Enter size for new partition (e.g., 2G, 120MiB): ").strip()
-        partition_size_mb = parse_size(partition_size_str)
+        partition_size_kb = parse_size(partition_size_str)
 
-        if partition_size_mb <= 0:
+        if partition_size_kb <= 0:
             typer.echo("❌ Partition size must be greater than zero.")
             raise typer.Abort()
 
-        if partition_size_mb > free_space_mb:
-            typer.echo(f"❌ Not enough free space. Requested: {partition_size_mb:.2f} MiB, Available: {free_space_mb:.2f} MiB")
+        if partition_size_kb > free_space_kb:
+            typer.echo(
+                f"❌ Not enough free space. Requested: {partition_size_kb/1024:.2f} MiB, Available: {free_space_kb/1024:.2f} MiB")
             raise typer.Abort()
 
-        end_new_mb = start_mb + partition_size_mb
+        end_new_kb = start_kb + partition_size_kb
 
-        typer.echo(f"[ACTION] Creating partition from {start_mb:.2f}MiB to {end_new_mb:.2f}MiB")
+        typer.echo(f"[ACTION] Creating partition from {start_kb/1024:.2f}MiB to {end_new_kb/1024:.2f}MiB")
 
-        run(["parted", device, "--script", "mkpart", "primary", f"{start_mb:.2f}MiB", f"{end_new_mb:.2f}MiB"])
+        run(["parted", device, "--script", "mkpart", "primary", f"{start_kb:.2f}kB", f"{end_new_kb:.2f}kB"])
 
         list_partitions(device)
 
