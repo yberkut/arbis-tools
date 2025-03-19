@@ -1,9 +1,14 @@
-from src.core.utils import read_config, run_cmd, ask_confirm, list_partitions, parse_size, get_free_space, \
-    validate_partition_name
 import typer
 from pathlib import Path
 import subprocess
 import re
+
+from core.ask_confirm import ask_confirm
+from core.get_free_space import get_free_space
+from core.list_partitions import list_partitions
+from core.read_config import read_config
+from core.run_cmd import run_cmd
+from core.validate_partition_name import validate_partition_name
 
 
 def init_usb_store(dry_run: bool = False):
@@ -62,6 +67,7 @@ def init_usb_store(dry_run: bool = False):
             raise typer.Abort()
 
         start_str, end_str = free_spaces[-1]
+        from core.parse_size import parse_size
         start_kb = parse_size(start_str)
         end_kb = parse_size(end_str)
         free_space_kb = end_kb - start_kb

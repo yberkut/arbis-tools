@@ -5,26 +5,28 @@
 ## Структура проєкту
 
 ```
-arbis-tools/                    # Корінь проєкту
+arbis-tools/                        # Корінь проєкту
 ├── src/
-│   ├── core/                   # Базові, спільні утиліти
+│   ├── core/                       # Базові, спільні утиліти
+|   |   ├── tests/                  # Тести пакету core
+|   |   |   ├── __init__.py
+|   |   |   ├── test_parse_size.py  # Тести для core/parse_size.py
+│   |   |   └── (інші тести core)
+|   |   |
 |   |   ├── __init__.py
-│   |   ├── utils.py            # Загальні функції (parse_size, validate_partition_name, тощо)
+│   |   ├── parse_size.py       
 |   |   └── (інші модулі core)
 │   |
-│   └── ksm/                    # Key & Secret Manager (KSM) - модуль управління ключами
+│   └── ksm/                        # Key & Secret Manager (KSM) - модуль управління ключами
 |       ├── __init__.py
-│       ├── usb.py              # Логіка ініціалізації USB store
+│       ├── usb.py                  # Логіка ініціалізації USB store
 |       └── (інші модулі KSM)
 │
-├── tests/                      # Юніт тести
-│   ├── test_utils.py           # Тести для core/utils.py
-│   └── (інші тести)
-│
-├── pytest.ini                  # Конфігурація для pytest
-├── requirements-dev.txt        # Залежності для тестування (pytest, pytest-mock)
-├── pyproject.toml              # Основна конфігурація Python-пакету
-└── README.md                   # Документація проєкту
+├── arbis-tools-config.yaml         # Конфігурація arbis-tools
+├── pyproject.toml                  # Основна конфігурація Python-пакету
+├── pytest.ini                      # Конфігурація для pytest
+├── README.md                       # Документація проєкту
+└── requirements-dev.txt            # Залежності для тестування (pytest, pytest-mock)
 ```
 
 ## Опис основних директорій
