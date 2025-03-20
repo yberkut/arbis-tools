@@ -1,6 +1,6 @@
 import typer
 from ksm.keys import create_key as createkey_func
-from ksm.usb import init_usb_store as init_usb_store_func
+from ksm.usb import init_usb_store as init_usb_store_func, unlock_usb_store as unlock_usb_store_func, lock_usb_store as lock_usb_store_func
 from core.read_config import read_config
 
 app = typer.Typer(help="Key and Secret Manager (KSM) for Arbis Tools")
@@ -97,13 +97,19 @@ def init_usb_store(
 
 
 @app.command()
-def unlock_usb_store():
-    typer.echo("[UNLOCK-USB-STORE]")
+def unlock_usb_store(
+        dry_run: bool = typer.Option(False, "--dry-run", help="Show actions without executing")
+):
+    """Unlock and mount the USB LUKS storage."""
+    unlock_usb_store_func(dry_run=dry_run)
 
 
 @app.command()
-def lock_usb_store():
-    typer.echo("[LOCK-USB-STORE]")
+def lock_usb_store(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show actions without executing")
+):
+    """Lock and unmount the USB LUKS storage."""
+    lock_usb_store_func(dry_run=dry_run)
 
 
 if __name__ == "__main__":

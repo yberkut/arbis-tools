@@ -6,9 +6,69 @@ import re
 from core.ask_confirm import ask_confirm
 from core.get_free_space import get_free_space
 from core.list_partitions import list_partitions
+from core.messages import error_message, dry_run_message, console_message, success_message
 from core.read_config import read_config
 from core.run_cmd import run_cmd
 from core.validate_partition_name import validate_partition_name
+
+
+def lock_usb_store(dry_run: bool = False):
+    """Unmounts and locks the USB LUKS storage."""
+    config = read_config()
+    usb_conf = config['usb']
+    mount_point = Path(usb_conf['mount_point'])
+    luks_name = usb_conf['luks_name']
+
+    def run(cmd):
+        if dry_run:
+            dry_run_message(cmd)
+        else:
+            run_cmd(cmd)
+
+    # Check if mount point exists (ignored in dry run)
+    if not dry_run and not mount_point.exists():
+        error_message(f"Mount point {mount_point} does not exist. Nothing to lock.")
+        return
+
+    # Unmount the filesystem
+    run(["umount", str(mount_point)])
+
+    # Lock the LUKS container
+    run(["cryptsetup", "close", luks_name])
+
+    success_message("USB store locked successfully.")
+
+
+def unlock_usb_store(dry_run: bool = False):
+    """Unlocks and mounts the USB LUKS storage."""
+    config = read_config()
+    usb_conf = config['usb']
+
+    device = usb_conf['device']
+    luks_name = usb_conf['luks_name']
+    mount_point = Path(usb_conf['mount_point'])
+    luks_device_path = f"/dev/mapper/{luks_name}"
+
+    def run(cmd):
+        if dry_run:
+            dry_run_message(cmd)
+        else:
+            run_cmd(cmd)
+
+    console_message(f"[INFO] Unlocking USB store on {device}...")
+    list_partitions(device)
+
+    partition = input("Enter partition name (e.g., sdb2): ").strip()
+    validate_partition_name(partition, device, skip_validation=dry_run)
+    full_partition = f"/dev/{partition}"
+
+    run(["cryptsetup", "open", full_partition, luks_name])
+
+    if not dry_run:
+        mount_point.mkdir(parents=True, exist_ok=True)
+    run(["mount", luks_device_path, str(mount_point)])
+
+    success_message(f"USB store unlocked and mounted at {mount_point}")
 
 
 def init_usb_store(dry_run: bool = False):
@@ -17,7 +77,7 @@ def init_usb_store(dry_run: bool = False):
 
     device = usb_conf['device']
     if not re.match(r'^/dev/(disk/by-id/|sd[a-z])', device):
-        typer.echo(f"❌ Invalid device path: {device}")
+        error_message(f"Invalid device path: {device}")
         raise typer.Abort()
 
     luks_name = usb_conf['luks_name']
@@ -25,15 +85,15 @@ def init_usb_store(dry_run: bool = False):
 
     def run(cmd):
         if dry_run:
-            typer.echo(f"[DRY-RUN] {' '.join(cmd)}")
+            dry_run_message(cmd)
         else:
             run_cmd(cmd)
 
     list_partitions(device)
 
-    typer.echo("\n[CHOICE] Select an option:")
-    typer.echo("1) Use existing partition")
-    typer.echo("2) Create new partition")
+    console_message("\n[CHOICE] Select an option:")
+    console_message("1) Use existing partition")
+    console_message("2) Create new partition")
     choice = input("Enter choice (1/2): ").strip()
 
     luks_device_path = None
@@ -43,14 +103,14 @@ def init_usb_store(dry_run: bool = False):
         validate_partition_name(partition, device, skip_validation=dry_run)
         full_partition = f"/dev/{partition}"
 
-        typer.echo(f"[INFO] Checking if {full_partition} is LUKS...")
+        console_message(f"[INFO] Checking if {full_partition} is LUKS...")
         result = subprocess.run(["sudo", "cryptsetup", "isLuks", full_partition])
         if result.returncode == 0:
-            typer.echo(f"✅ {full_partition} is a valid LUKS partition. Trying to open...")
+            success_message(f"{full_partition} is a valid LUKS partition. Trying to open...")
             run(["cryptsetup", "open", full_partition, luks_name])
         else:
             if not ask_confirm(f"⚠️ {full_partition} is NOT LUKS. All data will be erased. Continue?"):
-                typer.echo("Aborted.")
+                error_message("Aborted.")
                 raise typer.Abort()
             run(["cryptsetup", "luksFormat", full_partition])
             run(["cryptsetup", "open", full_partition, luks_name])
@@ -60,10 +120,10 @@ def init_usb_store(dry_run: bool = False):
         luks_device_path = f"/dev/mapper/{luks_name}"
 
     elif choice == '2':
-        typer.echo("[INFO] Checking free space...")
+        console_message("[INFO] Checking free space...")
         free_spaces = get_free_space(device)
         if not free_spaces:
-            typer.echo("❌ No free space available. Aborting.")
+            error_message("No free space available. Aborting.")
             raise typer.Abort()
 
         start_str, end_str = free_spaces[-1]
@@ -72,23 +132,23 @@ def init_usb_store(dry_run: bool = False):
         end_kb = parse_size(end_str)
         free_space_kb = end_kb - start_kb
 
-        typer.echo(f"[INFO] Last free space: {start_kb} kB - {end_kb} kB (Total: {free_space_kb:.2f} kB)")
+        console_message(f"[INFO] Last free space: {start_kb} kB - {end_kb} kB (Total: {free_space_kb:.2f} kB)")
 
         partition_size_str = input("Enter size for new partition (e.g., 2G, 120MiB): ").strip()
         partition_size_kb = parse_size(partition_size_str)
 
         if partition_size_kb <= 0:
-            typer.echo("❌ Partition size must be greater than zero.")
+            error_message("Partition size must be greater than zero.")
             raise typer.Abort()
 
         if partition_size_kb > free_space_kb:
-            typer.echo(
-                f"❌ Not enough free space. Requested: {partition_size_kb/1024:.2f} MiB, Available: {free_space_kb/1024:.2f} MiB")
+            error_message(
+                f"Not enough free space. Requested: {partition_size_kb / 1024:.2f} MiB, Available: {free_space_kb / 1024:.2f} MiB")
             raise typer.Abort()
 
         end_new_kb = start_kb + partition_size_kb
 
-        typer.echo(f"[ACTION] Creating partition from {start_kb/1024:.2f}MiB to {end_new_kb/1024:.2f}MiB")
+        console_message(f"[ACTION] Creating partition from {start_kb / 1024:.2f}MiB to {end_new_kb / 1024:.2f}MiB")
 
         run(["parted", device, "--script", "mkpart", "primary", f"{start_kb:.2f}kB", f"{end_new_kb:.2f}kB"])
 
@@ -96,7 +156,7 @@ def init_usb_store(dry_run: bool = False):
 
         partition = input("Enter new partition name (e.g., sdb3): ").strip()
         if dry_run:
-            typer.echo(f"[DRY-RUN] Assuming partition {partition} would be created.")
+            dry_run_message(f"Assuming partition {partition} would be created.")
         validate_partition_name(partition, device, skip_validation=dry_run)
         full_partition = f"/dev/{partition}"
 
@@ -106,7 +166,7 @@ def init_usb_store(dry_run: bool = False):
         run(["mkfs.ext4", luks_device_path])
 
     else:
-        typer.echo("❌ Invalid choice. Aborting.")
+        error_message("Invalid choice. Aborting.")
         raise typer.Abort()
 
     if not dry_run:
@@ -117,11 +177,11 @@ def init_usb_store(dry_run: bool = False):
         (mount_point / "keys" / "vms").mkdir(parents=True, exist_ok=True)
         (mount_point / "passwords").mkdir(parents=True, exist_ok=True)
 
-        typer.echo(f"✅ USB store initialized at {mount_point}")
+        success_message(f"USB store initialized at {mount_point}")
 
         run(["umount", str(mount_point)])
         run(["cryptsetup", "close", luks_name])
 
-        typer.echo("✅ USB store closed and ready.")
+        success_message("USB store closed and ready.")
     else:
-        typer.echo(f"[DRY-RUN] Would initialize and prepare USB store at {mount_point}")
+        dry_run_message(f"Would initialize and prepare USB store at {mount_point}")
