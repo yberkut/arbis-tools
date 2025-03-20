@@ -3,8 +3,9 @@ usb:
   luks_name: "usb_crypt"
   mount_point: "/mnt/usb"
   keyfile: "main_keyfile"
-  header: "main_header.img"
+  key_type: "system"
   keyfile_size: 4096
+  header: "main_header.img"
 
 # Майбутні розділи конфігу (для розширення пізніше):
 
