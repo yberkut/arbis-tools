@@ -6,15 +6,14 @@ import re
 from core.get_free_space import get_free_space
 from core.list_partitions import list_partitions
 from core.messages import error_message, dry_run_message, console_message, success_message, ask_confirm
-from core.read_config import read_config
+from core.config import read_usb_config
 from core.run_cmd import run_cmd
 from core.validate_partition_name import validate_partition_name
 
 
 def lock_usb_store(dry_run: bool = False):
     """Unmounts and locks the USB LUKS storage."""
-    config = read_config()
-    usb_conf = config['usb']
+    usb_conf = read_usb_config()
     mount_point = Path(usb_conf['mount_point'])
     luks_name = usb_conf['luks_name']
 
@@ -40,8 +39,7 @@ def lock_usb_store(dry_run: bool = False):
 
 def unlock_usb_store(dry_run: bool = False):
     """Unlocks and mounts the USB LUKS storage."""
-    config = read_config()
-    usb_conf = config['usb']
+    usb_conf = read_usb_config()
 
     device = usb_conf['device']
     luks_name = usb_conf['luks_name']
@@ -71,8 +69,7 @@ def unlock_usb_store(dry_run: bool = False):
 
 
 def init_usb_store(dry_run: bool = False):
-    config = read_config()
-    usb_conf = config['usb']
+    usb_conf = read_usb_config()
 
     device = usb_conf['device']
     if not re.match(r'^/dev/(disk/by-id/|sd[a-z])', device):

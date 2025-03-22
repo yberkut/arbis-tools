@@ -4,9 +4,11 @@ import shutil
 import typer
 from pathlib import Path
 
-from core.read_config import read_config
+from build.lib.core.messages import console_message
+from core.config import read_usb_config
 from core.messages import dry_run_message, success_message, error_message, ask_confirm
 from core.run_cmd import run_cmd
+from ksm.config import get_usb_key_dirs, get_usb_mount_point
 
 
 def create_key(name: str, key_type: str, key_size: int, dry_run: bool):
@@ -20,16 +22,9 @@ def create_key(name: str, key_type: str, key_size: int, dry_run: bool):
         error_message(f"Invalid key type. Valid types: {valid_types}")
         raise typer.Abort()
 
-    config = read_config()
-    usb_conf = config.get('usb', {})
-    mount_point = Path(usb_conf.get('mount_point', '/mnt/usb'))
-
+    usb_conf = read_usb_config()
     # Determine the key storage directory
-    key_dirs = {
-        'system': mount_point / "keys" / "system",
-        'vm': mount_point / "keys" / "vms",
-        'backup': mount_point / "keys" / "backup"
-    }
+    key_dirs = get_usb_key_dirs(usb_conf)
     key_dir = key_dirs.get(key_type)
 
     # Ensure key storage directory exists
@@ -68,72 +63,44 @@ def create_key(name: str, key_type: str, key_size: int, dry_run: bool):
 
 def delete_key(name: str, dry_run: bool = False):
     """Deletes a key from the USB storage."""
-    config = read_config()
-    usb_conf = config['usb']
-    mount_point = Path(usb_conf['mount_point'])
+    usb_conf = read_usb_config()
+    key_dirs = get_usb_key_dirs(usb_conf)
 
-    # Search for the key in possible directories
-    key_paths = [
-        mount_point / "keys" / "system" / f"{name}",
-        mount_point / "keys" / "vms" / f"{name}",
-        mount_point / "keys" / "backup" / f"{name}"
-    ]
+    key_file = next((path / name for path in key_dirs.values() if (path / name).exists()), None)
 
-    key_file = next((path for path in key_paths if path.exists()), None)
-
-    if not key_file and not dry_run:
+    if not key_file:
         error_message(f"Key '{name}' not found.")
         return
 
-    # Confirm deletion
     if not ask_confirm(f"Are you sure you want to delete the key: {key_file}?"):
         error_message("Operation aborted by user.")
         return
 
-    # Dry-run mode
     if dry_run:
         dry_run_message(f"Would delete key: {key_file}")
         return
 
-    # Delete the key
     key_file.unlink()
     success_message(f"Key '{name}' deleted successfully.")
 
 
 def list_keys(dry_run: bool):
     """Lists all stored keys in a tree-like structure.
-
-    Example output:
-
-    🔑 Stored keys:
-    📂 System
-       ├── main.key
-       ├── backup.key
-    📂 VMs
-       ├── vm1.key
-    📂 Backup
-       ├── external_backup.key
+    Use --dry-run to see how it could look like
     """
-    config = read_config()
-    usb_conf = config['usb']
-    mount_point = Path(usb_conf['mount_point'])
+    usb_conf = read_usb_config()
+    key_dirs = get_usb_key_dirs(usb_conf)
 
-    key_dirs = {
-        'System': mount_point / "keys" / "system",
-        'VMs': mount_point / "keys" / "vms",
-        'Backup': mount_point / "keys" / "backup"
-    }
-
-    typer.echo("🔑 Stored keys:")
+    console_message("🔑 Stored keys:")
 
     if dry_run:
-        typer.echo("📂 System")
-        typer.echo("   ├── main.key")
-        typer.echo("   ├── backup.key")
-        typer.echo("📂 VMs")
-        typer.echo("   ├── vm1.key")
-        typer.echo("📂 Backup")
-        typer.echo("   ├── external_backup.key")
+        console_message("📂 system")
+        console_message("   ├── main.key")
+        console_message("   ├── backup.key")
+        console_message("📂 vm")
+        console_message("   ├── vm1.key")
+        console_message("📂 backup")
+        console_message("   ├── external_backup.key")
         return
 
     found_keys = False
@@ -143,9 +110,9 @@ def list_keys(dry_run: bool):
             keys = list(path.iterdir())
             if keys:
                 found_keys = True
-                typer.echo(f"📂 {category}")
+                console_message(f"📂 {category}")
                 for key in keys:
-                    typer.echo(f"   ├── {key.name}")
+                    console_message(f"   ├── {key.name}")
 
     if not found_keys:
         error_message("No keys found.")
@@ -153,15 +120,8 @@ def list_keys(dry_run: bool):
 
 def rotate_key(name: str, key_type: str, luks_device: str, slot: int, dry_run: bool):
     """Rotates a key in the specified LUKS container at a given slot."""
-    config = read_config()
-    usb_conf = config['usb']
-    mount_point = Path(usb_conf['mount_point'])
-
-    key_dirs = {
-        'system': mount_point / "keys" / "system",
-        'vm': mount_point / "keys" / "vms",
-        'backup': mount_point / "keys" / "backup"
-    }
+    usb_conf = read_usb_config()
+    key_dirs = get_usb_key_dirs(usb_conf)
 
     key_dir = key_dirs.get(key_type)
     if not key_dir:
@@ -183,8 +143,8 @@ def rotate_key(name: str, key_type: str, luks_device: str, slot: int, dry_run: b
         # Show LUKS slot usage
         existing_keys = run_cmd(["cryptsetup", "luksDump", luks_device], capture_output=True, text=True,
                                 check=True).stdout
-        typer.echo("🔍 Existing LUKS Slots:")
-        typer.echo(existing_keys)
+        console_message("🔍 Existing LUKS Slots:")
+        console_message(existing_keys)
 
         # Add new key to the specified slot
         run_cmd(["cryptsetup", "luksAddKey", luks_device, str(key_file)], check=True)
@@ -199,15 +159,8 @@ def rotate_key(name: str, key_type: str, luks_device: str, slot: int, dry_run: b
 
 def backup_keys(destination: Path, key_type: str = None, key_name: str = None, dry_run: bool = False):
     """Backs up all keys, keys from a specific directory, or a specific key."""
-    config = read_config()
-    usb_conf = config['usb']
-    mount_point = Path(usb_conf['mount_point'])
-
-    key_dirs = {
-        'system': mount_point / "keys" / "system",
-        'vm': mount_point / "keys" / "vms",
-        'backup': mount_point / "keys" / "backup"
-    }
+    usb_conf = read_usb_config()
+    key_dirs = get_usb_key_dirs(usb_conf)
 
     if key_name:
         if not key_type or key_type not in key_dirs:
@@ -243,6 +196,7 @@ def backup_keys(destination: Path, key_type: str = None, key_name: str = None, d
         success_message(f"All keys from '{key_type}' backed up successfully to {destination}")
 
     else:
+        mount_point = get_usb_mount_point(usb_conf)
         if dry_run:
             dry_run_message(f"Would copy all keys from {mount_point}/keys to {destination}")
             return
