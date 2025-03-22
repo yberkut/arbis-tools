@@ -3,10 +3,9 @@ from pathlib import Path
 import subprocess
 import re
 
-from core.ask_confirm import ask_confirm
 from core.get_free_space import get_free_space
 from core.list_partitions import list_partitions
-from core.messages import error_message, dry_run_message, console_message, success_message
+from core.messages import error_message, dry_run_message, console_message, success_message, ask_confirm
 from core.read_config import read_config
 from core.run_cmd import run_cmd
 from core.validate_partition_name import validate_partition_name
