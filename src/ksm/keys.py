@@ -3,7 +3,6 @@ import shutil
 
 from pathlib import Path
 
-from core.run_cmd import run_cmd
 from core.messages import dry_run_message, success_message, error_message, ask_confirm, console_message
 
 
@@ -101,52 +100,25 @@ def delete_key(key_path: Path, dry_run: bool = False):
     success_message(f"Key '{key_path}' deleted successfully.")
 
 
-def rotate_key(name: str, luks_device: str, slot: int, dry_run: bool):
+def backup_keys(source: Path, destination: Path, dry_run: bool = False):
     """
-    Rotates a key in the specified LUKS container at a given slot.
+    Backs up all key files from the source directory to the destination directory.
 
     Args:
-        name (str): The file path of the new key to add.
-        luks_device (str): The LUKS container device (e.g., /dev/mapper/vg0-root).
-        slot (int): The LUKS key slot to replace.
-        dry_run (bool, optional): If True, simulates the key rotation without executing it. Defaults to False.
+        source (Path): The path to the directory containing key files to be backed up.
+        destination (Path): The path to the destination directory where the keys will be copied.
+        dry_run (bool, optional): If True, simulates the backup process without copying any files. Defaults to False.
 
     Returns:
         None
 
     Behavior:
-    - If the specified key file does not exist, an error message is displayed.
-    - If dry_run is enabled, prints what actions would be performed.
-    - The function first checks existing LUKS key slots.
-    - It then adds the new key and removes the old one from the specified slot.
+    - If the source directory does not exist or is not a directory, an error message is displayed, and the function exits.
+    - If dry_run is enabled, the function prints a message indicating what it would do without making any changes.
+    - If dry_run is disabled, all files and subdirectories from the source directory are copied to the destination.
+    - If the destination directory already exists, existing files will be overwritten.
+    - A success message is displayed once the backup is complete.
     """
-    key_file = Path(name)
-    if not key_file.exists():
-        error_message(f"Key '{name}' not found.")
-        return
-
-    if dry_run:
-        dry_run_message(f"Would check existing LUKS slots in {luks_device}")
-        dry_run_message(f"Would add new key from {key_file} to slot {slot} in {luks_device}")
-        dry_run_message(f"Would remove key from slot {slot} in {luks_device}")
-        return
-
-    try:
-        existing_keys = run_cmd(["cryptsetup", "luksDump", luks_device], capture_output=True, text=True,
-                                check=True).stdout
-        console_message("🔍 Existing LUKS Slots:")
-        console_message(existing_keys)
-
-        run_cmd(["cryptsetup", "luksAddKey", luks_device, str(key_file)], check=True)
-        run_cmd(["cryptsetup", "luksKillSlot", luks_device, str(slot)], check=True)
-
-        success_message(f"Key '{name}' successfully rotated in slot {slot} of {luks_device}.")
-    except Exception as e:
-        error_message(f"Failed to rotate key '{name}' in {luks_device}: {str(e)}")
-
-
-def backup_keys(source: Path, destination: Path, dry_run: bool = False):
-    """Backs up all keys from the source directory to the destination."""
     if not source.exists() or not source.is_dir():
         error_message(f"Source directory '{source}' does not exist.")
         return

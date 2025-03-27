@@ -43,16 +43,5 @@ def delete_key_cmd(
     delete_key(key_path, dry_run)
 
 
-@app.command()
-def rotate_key_cmd(
-        name: str = typer.Argument(..., help="Path to the key file"),
-        luks_device: str = typer.Argument(..., help="LUKS container device (e.g., /dev/mapper/vg0-root)"),
-        slot: int = typer.Argument(..., help="LUKS key slot to replace"),
-        dry_run: bool = typer.Option(False, "--dry-run", help="Show actions without executing")
-):
-    """Rotates a key in the specified LUKS container."""
-    rotate_key(name, luks_device, slot, dry_run)
-
-
 if __name__ == "__main__":
     app()
